@@ -1,0 +1,110 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <map>
+#include <cmath>
+
+using namespace std;
+
+using Share = pair<int, int>;
+
+
+double interpolateAtZero(const vector<Share>& points) {
+    double result = 0.0;
+    int k = points.size();
+
+    for (int i = 0; i < k; ++i) {
+        double xi = points[i].first;
+        double yi = points[i].second;
+        double term = yi;
+
+        for (int j = 0; j < k; ++j) {
+            if (i == j) continue;
+            double xj = points[j].first;
+            term *= (-xj) / (xi - xj);
+        }
+
+        result += term;
+    }
+
+    return result;
+}
+
+
+void generateCombinations(const vector<Share>& shares, int k,
+                          vector<vector<Share>>& output,
+                          int start = 0, vector<Share> current = {}) {
+    if (current.size() == k) {
+        output.push_back(current);
+        return;
+    }
+
+    for (int i = start; i < shares.size(); ++i) {
+        current.push_back(shares[i]);
+        generateCombinations(shares, k, output, i + 1, current);
+        current.pop_back();
+    }
+}
+
+
+pair<double, Share> findSecretAndRogue(const vector<Share>& shares, int k) {
+    map<double, int> secretFrequency;
+    map<vector<Share>, double> combinationSecrets;
+    vector<vector<Share>> allCombos;
+
+    generateCombinations(shares, k, allCombos);
+
+    for (const auto& combo : allCombos) {
+        double secret = interpolateAtZero(combo);
+        secretFrequency[secret]++;
+        combinationSecrets[combo] = secret;
+    }
+
+    double trueSecret = 0.0;
+    int maxCount = 0;
+    for (const auto& [secret, count] : secretFrequency) {
+        if (count > maxCount) {
+            maxCount = count;
+            trueSecret = secret;
+        }
+    }
+
+    map<Share, int> validShares;
+    for (const auto& [combo, secret] : combinationSecrets) {
+        if (abs(secret - trueSecret) < 1e-6) {
+            for (const auto& share : combo) {
+                validShares[share]++;
+            }
+        }
+    }
+
+    Share rogue = {-1, -1};
+    for (const auto& share : shares) {
+        if (validShares.find(share) == validShares.end()) {
+            rogue = share;
+            break;
+        }
+    }
+
+    return {trueSecret, rogue};
+}
+
+int main() {
+    vector<Share> shares = {
+        {1, 160},
+        {2, 170},
+        {3, 180},
+        {4, 190},
+        {5, 500},                                                                                
+        {6, 210}
+    };
+
+    int k = 4;
+
+    auto [secret, rogue] = findSecretAndRogue(shares, k);
+
+    cout << "Secret is: " << secret << endl;
+    cout << "Rogue share is: (" << rogue.first << ", " << rogue.second << ")" << endl;
+
+    return 0;
+}
